@@ -37,16 +37,12 @@ RUN echo "Installing Java JDK ${JDK_VERSION}..." && \
     mv apache-tomcat-${TOMCAT_VERSION} ${CATALINA_HOME} && \
     chmod +x ${CATALINA_HOME}/bin/*sh
 
-# Tomcat setup
+# Tomcat scripts setup
 COPY scripts/ ${CATALINA_HOME}/scripts/
 RUN chmod +x ${CATALINA_HOME}/scripts/*.sh && \
-    groupadd -r tomcat && \
-    useradd -g tomcat -d ${CATALINA_HOME} -s /sbin/nologin  -c "Tomcat user" tomcat && \
-    chown -R tomcat: ${CATALINA_HOME} && \
     ${CATALINA_HOME}/scripts/create_admin.sh
 
 # Expose and Start Services
 WORKDIR ${CATALINA_HOME}
 EXPOSE 8080 8009
-USER tomcat
 ENTRYPOINT ["/opt/tomcat/scripts/tomcat.sh"]
