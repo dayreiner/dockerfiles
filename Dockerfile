@@ -14,7 +14,7 @@ ENV JDK_MAJOR_VERSION=7u80 \
 # Update and install latest packages and prerequisites
 RUN yum -y update && yum clean all && yum -y install wget
     
-ADD config/ /opt/
+COPY config/ /opt/
 
 # Install Oracle JDK and Tomcat
 RUN echo "Installing Java JDK ${JDK_VERSION}..." && \
@@ -38,7 +38,7 @@ RUN echo "Installing Java JDK ${JDK_VERSION}..." && \
     chmod +x ${CATALINA_HOME}/bin/*sh
 
 # Tomcat setup
-ADD scripts/ ${CATALINA_HOME}/scripts/
+COPY scripts/ ${CATALINA_HOME}/scripts/
 RUN chmod +x ${CATALINA_HOME}/scripts/*.sh && \
     groupadd -r tomcat && \
     useradd -g tomcat -d ${CATALINA_HOME} -s /sbin/nologin  -c "Tomcat user" tomcat && \
