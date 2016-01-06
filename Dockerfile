@@ -15,7 +15,6 @@ RUN yum -y update && yum clean all && \
 COPY config/server.cnf /etc/my.cnf.d/server.cnf
 COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
 
-VOLUME /var/lib/mysql
 EXPOSE 3306
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["mysqld"]
