@@ -1,4 +1,4 @@
-FROM centos:httpd
+FROM centos/httpd:latest
 MAINTAINER dayreiner
 
 # Update and install latest packages and prerequisites
