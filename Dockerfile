@@ -44,4 +44,4 @@ RUN chmod +x ${CATALINA_HOME}/scripts/*.sh
 # Expose and Start Services
 WORKDIR ${CATALINA_HOME}
 EXPOSE 8080 8009
-ENTRYPOINT ["/opt/tomcat/scripts/tomcat.sh"]
+CMD ["/opt/tomcat/scripts/tomcat.sh"]
