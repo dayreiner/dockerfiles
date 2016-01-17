@@ -39,8 +39,7 @@ RUN echo "Installing Java JDK ${JDK_VERSION}..." && \
 
 # Tomcat scripts setup
 COPY scripts/ ${CATALINA_HOME}/scripts/
-RUN chmod +x ${CATALINA_HOME}/scripts/*.sh && \
-    ${CATALINA_HOME}/scripts/create_admin.sh
+RUN chmod +x ${CATALINA_HOME}/scripts/*.sh
 
 # Expose and Start Services
 WORKDIR ${CATALINA_HOME}
