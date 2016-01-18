@@ -14,6 +14,6 @@ RUN echo "Setting up SSH for GitHub Checkouts..." && \
     ssh-keyscan -H github.com >> /root/.ssh/known_hosts && \
     chmod 600 /root/.ssh/known_hosts
 
-EXPOSE 22 80
+EXPOSE 80
 ENTRYPOINT ["/usr/sbin/httpd"]
 CMD ["-DFOREGROUND"]
