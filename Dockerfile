@@ -2,8 +2,8 @@ FROM centos:latest
 MAINTAINER dayreiner
 
 # Tomcat and Java Vars
-ENV JDK_MAJOR_VERSION=7u80 \
-    JDK_VERSION=1.7.0_80 \
+ENV JDK_MAJOR_VERSION=8u74 \
+    JDK_VERSION=1.8.0_74 \
     TOMCAT_MAJOR_VERSION=8 \
     TOMCAT_VERSION=8.0.29 \
     JAVA_HOME=/opt/java \
@@ -20,7 +20,7 @@ COPY config/ /opt/
 RUN echo "Installing Java JDK ${JDK_VERSION}..." && \
     cd /opt && \
     wget -nv --no-check-certificate --no-cookies --header "Cookie: oraclelicense=accept-securebackup-cookie" \
-    http://download.oracle.com/otn-pub/java/jdk/${JDK_MAJOR_VERSION}-b15/jdk-${JDK_MAJOR_VERSION}-linux-x64.tar.gz \
+    http://download.oracle.com/otn-pub/java/jdk/${JDK_MAJOR_VERSION}-b02/jdk-${JDK_MAJOR_VERSION}-linux-x64.tar.gz \
     -O /opt/jdk-${JDK_MAJOR_VERSION}-linux-x64.tar.gz && \
     echo "Checking file integrity..." && \
     sha1sum -c /opt/jdk-${JDK_MAJOR_VERSION}-linux-x64.tar.gz.sha && \
