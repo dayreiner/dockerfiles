@@ -1,0 +1,56 @@
+version: 2
+services:
+  db1:
+    container_name: db1
+    hostname: db1
+    restart: never
+    ports:
+     - "${db1_sql_port}"
+    expose:
+     - "3306"
+     - "4567"
+     - "4444"
+    env_file:
+     - common.env
+    environment:
+     - CLUSTER=db1,db2,db3
+    volumes:
+     - ${mariadb_volume_db1}
+    build:
+      context: ../
+  db2:
+    container_name: db2
+    hostname: db2
+    restart: never
+    ports:
+     - "${db2_sql_port}"
+    expose:
+     - "3306"
+     - "4567"
+     - "4444"
+    env_file:
+     - common.env
+    environment:
+     - CLUSTER=db1,db2,db3
+    volumes:
+     - ${mariadb_volume_db2}
+    build:
+      context: ../
+  db3:
+    container_name: db3
+    hostname: db3
+    restart: never
+    ports:
+     - "${db3_sql_port}"
+    expose:
+     - "3306"
+     - "4567"
+     - "4444"
+    env_file:
+     - common.env
+    environment:
+     - CLUSTER=db1,db2,db3
+    volumes:
+     - ${mariadb_volume_db3}
+    build:
+      context: ../

@@ -1,14 +1,19 @@
 #!/bin/bash
 set -e
+set -x
+
+exec 1> >(logger -s -t $(basename $0)) 2>&1
 
 # if command starts with an option, prepend mysqld
 if [ "${1:0:1}" = '-' ]; then
 	set -- mysqld "$@"
 fi
 
+
 if [ "$1" = 'mysqld' ]; then
 	# Get config
-	DATADIR="$("$@" --verbose --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
+	#DATADIR="$("$@" --verbose --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
+	DATADIR="/var/lib/mysql"
 
 	if [ ! -d "$DATADIR/mysql" ]; then
 		if [ -z "$MYSQL_ROOT_PASSWORD" -a -z "$MYSQL_ALLOW_EMPTY_PASSWORD" ]; then
@@ -54,6 +59,8 @@ if [ "$1" = 'mysqld' ]; then
 			DELETE FROM mysql.user ;
 			CREATE USER 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' ;
 			GRANT ALL ON *.* TO 'root'@'%' WITH GRANT OPTION ;
+			CREATE USER 'sst'@'%' IDENTIFIED BY 'sst_pass' ;
+			GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sst'@'%' ;
 			DROP DATABASE IF EXISTS test ;
 			FLUSH PRIVILEGES ;
 		EOSQL
@@ -97,7 +104,25 @@ if [ "$1" = 'mysqld' ]; then
 		echo
 	fi
 
-	chown -R mysql:mysql "$DATADIR"
+	chown -R mysql:mysql "/var/lib/mysql"
 fi
 
-exec "$@"
+if [ -z ${CLUSTER+x} ]; then
+    echo "CLUSTER variable must be STANDALONE, INIT or comma-separated list of node container names."
+    exit 1
+elif [ ${CLUSTER} = "STANDALONE" ]; then
+	exec "$@" 
+elif [ ${CLUSTER} = "INIT" ]; then
+    echo "wsrep_on                       = ON" >> /etc/my.cnf.d/server.cnf
+    exec $@ --wsrep_node_address="${HOSTNAME}" \
+	--wsrep_cluster_name="${CLUSTER_NAME}" \
+        --wsrep_new_cluster --wsrep_cluster_address="gcomm://" \
+	--wsrep_node_name="${HOSTNAME}" 
+else
+    echo "wsrep_on                       = ON" >> /etc/my.cnf.d/server.cnf
+    CLUSTER="gcomm://$CLUSTER"
+    exec $@ --wsrep_node_address="${HOSTNAME}" \
+	--wsrep_cluster_name="${CLUSTER_NAME}" \
+        --wsrep_cluster_address=$CLUSTER \
+	--wsrep_node_name="${HOSTNAME}"
+fi

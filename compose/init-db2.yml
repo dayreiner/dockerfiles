@@ -1,0 +1,11 @@
+version: 2
+services:
+  db2:
+    environment:
+     - CLUSTER=INIT
+  db1:
+    depends_on:
+     - db2
+  db3:
+    depends_on:
+     - db1

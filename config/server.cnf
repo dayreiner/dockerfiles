@@ -15,7 +15,7 @@ bind-address                   = 0.0.0.0
 
 # MyISAM #
 key-buffer-size                = 32M
-myisam-recover                 = FORCE,BACKUP
+myisam-recover-options         = FORCE,BACKUP
 
 # SAFETY #
 max-allowed-packet             = 16M
@@ -27,7 +27,7 @@ innodb                         = FORCE
 innodb-strict-mode             = 1
 innodb-autoinc-lock-mode       = 2
 innodb-doublewrite             = 1
-innodb_flush_log_at_trx_commit = 2
+innodb_flush_log_at_trx_commit = 0
 innodb_file_per_table          = 1
 
 # DATA STORAGE #
@@ -63,3 +63,11 @@ log-error                      = /var/lib/mysql/mysql-error.log
 log-queries-not-using-indexes  = 1
 slow-query-log                 = 1
 slow-query-log-file            = /var/lib/mysql/mysql-slow.log
+
+# GALERA SETTINGS #
+[galera]
+wsrep_provider                 = /usr/lib64/galera/libgalera_smm.so
+wsrep_sst_method               = xtrabackup-v2
+wsrep_slave_threads            = 4
+innodb-flush-log-at-trx-commit = 2
+wsrep_sst_auth                 = sst:sst_pass
