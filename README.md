@@ -4,10 +4,10 @@
 CentOS 7 MariaDB 10.1 Galera cluster installation from the official MariaDB repository. Includes supervisord and sshd. Will automatically run any sql scripts in /docker-entrypoint-initdb.d as part of startup. 
 
 # Required Variables
-DBMODE=Can be either BOOTSTRAP, STANDALONE or a comma-separated list of container names
-SST_USER=DB Username for SST service
-SST_PASS=DB Password for SST service
-MYSQL_ROOT_PASSWORD=The MariaDB root database password
+* **DBMODE**=Can be either BOOTSTRAP, STANDALONE or a comma-separated list of container names
+* **SST_USER**=DB Username for SST service
+* **SST_PASS**=DB Password for SST service
+* **MYSQL_ROOT_PASSWORD**=The MariaDB root database password
 
 ## To run a standalone instance
 
