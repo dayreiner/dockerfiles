@@ -1,14 +1,38 @@
 #!/bin/bash
 set -e
-set -x
-
-exec 1> >(logger -s -t $(basename $0)) 2>&1
+#set -x
 
 # if command starts with an option, prepend mysqld
 if [ "${1:0:1}" = '-' ]; then
 	set -- mysqld "$@"
 fi
 
+attn () {
+    echo
+    echo "======================================="
+    echo
+}
+
+preflight () {
+    if [[ -z ${CLUSTER_NAME+x} ]]; then
+        attn
+        echo >&2 "CLUSTER_NAME variable must be set."
+        exit 1
+    elif [[ -z ${SST_USER+x} || -z ${SST_PASS+x} ]]; then
+        attn
+        echo >&2 "SST_USER and SST_PASS variables must be set in order to start the cluster."
+        exit 1
+    fi 
+}
+
+cluster_conf () {
+    attn
+    echo "Configuring /etc/my.cnf.d/server.cnf with cluster variables"
+    echo "wsrep_sst_auth                 = ${SST_USER}:${SST_PASS}" >> /etc/my.cnf.d/server.cnf
+    echo "wsrep_on                       = ON" >> /etc/my.cnf.d/server.cnf
+    # Set mysql log and slow query log to /dev/stdout for container logging
+    sed -i 's/NULL/\/dev\/stdout/g' /etc/my.cnf.d/server.cnf
+}
 
 if [ "$1" = 'mysqld' ]; then
 	# Get config
@@ -51,6 +75,23 @@ if [ "$1" = 'mysqld' ]; then
 			mysql_tzinfo_to_sql /usr/share/zoneinfo | sed 's/Local time zone must be set--see zic manual page/FCTY/' | "${mysql[@]}" mysql
 		fi
 
+
+		if [ ${DBMODE} = "BOOTSTRAP" ]; then
+			preflight
+			echo "Creating SST User for cluster state transfer..."
+			"${mysql[@]}" <<-EOSQL
+				--  Set up sst user for galera
+				SET @@SESSION.SQL_LOG_BIN=0;
+	
+				CREATE USER '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASS}' ;
+				GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%' ;
+				FLUSH PRIVILEGES ;
+			EOSQL
+		else
+			echo "SST_USER and SST_PASS must be set to bootstrap cluster.."
+			exit 1
+		fi
+
 		"${mysql[@]}" <<-EOSQL
 			-- What's done in this file shouldn't be replicated
 			--  or products like mysql-fabric won't work
@@ -59,8 +100,6 @@ if [ "$1" = 'mysqld' ]; then
 			DELETE FROM mysql.user ;
 			CREATE USER 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}' ;
 			GRANT ALL ON *.* TO 'root'@'%' WITH GRANT OPTION ;
-			CREATE USER 'sst'@'%' IDENTIFIED BY 'sst_pass' ;
-			GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'sst'@'%' ;
 			DROP DATABASE IF EXISTS test ;
 			FLUSH PRIVILEGES ;
 		EOSQL
@@ -107,22 +146,32 @@ if [ "$1" = 'mysqld' ]; then
 	chown -R mysql:mysql "/var/lib/mysql"
 fi
 
-if [ -z ${CLUSTER+x} ]; then
-    echo "CLUSTER variable must be STANDALONE, INIT or comma-separated list of node container names."
+if [ -z ${DBMODE+x} ]; then
+    attn
+    echo >&2 "DBMODE variable must be defined as STANDALONE, BOOTSTRAP or a comma-separated list of container names."
     exit 1
-elif [ ${CLUSTER} = "STANDALONE" ]; then
-	exec "$@" 
-elif [ ${CLUSTER} = "INIT" ]; then
-    echo "wsrep_on                       = ON" >> /etc/my.cnf.d/server.cnf
+elif [ ${DBMODE} = "STANDALONE" ]; then
+    attn
+    echo "Starting MariaDB in STANDALONE mode..."
+    # Set mysql log and slow query log to /dev/stdout for container logging
+    sed -i 's/NULL/\/dev\/stdout/g' /etc/my.cnf.d/server.cnf
+    exec "$@" 
+elif [ ${DBMODE} = "BOOTSTRAP" ]; then
+    attn
+    echo "Bootstrapping MariaDB cluster ${CLUSTER_NAME} with primary node ${HOSTNAME}..."
+    preflight
+    cluster_conf
     exec $@ --wsrep_node_address="${HOSTNAME}" \
 	--wsrep_cluster_name="${CLUSTER_NAME}" \
         --wsrep_new_cluster --wsrep_cluster_address="gcomm://" \
 	--wsrep_node_name="${HOSTNAME}" 
 else
-    echo "wsrep_on                       = ON" >> /etc/my.cnf.d/server.cnf
-    CLUSTER="gcomm://$CLUSTER"
+    attn
+    echo "Joining MariaDB cluster ${CLUSTER_NAME} on nodes ${DBMODE}..."
+    preflight
+    cluster_conf
     exec $@ --wsrep_node_address="${HOSTNAME}" \
 	--wsrep_cluster_name="${CLUSTER_NAME}" \
-        --wsrep_cluster_address=$CLUSTER \
+        --wsrep_cluster_address=gcomm://${DBMODE}
 	--wsrep_node_name="${HOSTNAME}"
 fi
