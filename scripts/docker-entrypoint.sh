@@ -87,10 +87,7 @@ if [ "$1" = 'mysqld' ]; then
 				GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%' ;
 				FLUSH PRIVILEGES ;
 			EOSQL
-		else
-			echo "SST_USER and SST_PASS must be set to bootstrap cluster.."
-			exit 1
-		fi
+		fi	
 
 		"${mysql[@]}" <<-EOSQL
 			-- What's done in this file shouldn't be replicated
