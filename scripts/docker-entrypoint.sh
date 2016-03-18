@@ -1,48 +1,51 @@
 #!/bin/bash
-set -e
-#set -x
+set -eo pipefail
+
+preflight () {
+    if [[ -z ${CLUSTER_NAME+x} ]]; then
+        echo >&2 "########### CLUSTER_NAME variable must be set."
+        exit 1
+    elif [[ -z ${SST_USER} || -z ${SST_PASS} ]]; then
+        echo >&2 "########### SST_USER and SST_PASS variables must be set in order to start the cluster."
+        exit 1
+   fi
+}
+
+cluster_conf () {
+    echo "########### Configuring /etc/my.cnf.d/server.cnf with cluster variables"
+    echo "wsrep_sst_auth                 = ${SST_USER}:${SST_PASS}" >> /etc/my.cnf.d/server.cnf
+    echo "wsrep_on                       = ON" >> /etc/my.cnf.d/server.cnf
+}
+
+
+initialize_db () {
+
+# Taken from https://github.com/docker-library/mariadb/blob/c64262339972ac2a8dadaf8141e012aa8ddb8c23/10.1/docker-entrypoint.sh
 
 # if command starts with an option, prepend mysqld
 if [ "${1:0:1}" = '-' ]; then
 	set -- mysqld "$@"
 fi
 
-attn () {
-    echo
-    echo "======================================="
-    echo
-}
+# skip setup if they want an option that stops mysqld
+wantHelp=
+for arg; do
+	case "$arg" in
+		-'?'|--help|--print-defaults|-V|--version)
+			wantHelp=1
+			break
+			;;
+	esac
+done
 
-preflight () {
-    if [[ -z ${CLUSTER_NAME+x} ]]; then
-        attn
-        echo >&2 "CLUSTER_NAME variable must be set."
-        exit 1
-    elif [[ -z ${SST_USER+x} || -z ${SST_PASS+x} ]]; then
-        attn
-        echo >&2 "SST_USER and SST_PASS variables must be set in order to start the cluster."
-        exit 1
-    fi 
-}
-
-cluster_conf () {
-    attn
-    echo "Configuring /etc/my.cnf.d/server.cnf with cluster variables"
-    echo "wsrep_sst_auth                 = ${SST_USER}:${SST_PASS}" >> /etc/my.cnf.d/server.cnf
-    echo "wsrep_on                       = ON" >> /etc/my.cnf.d/server.cnf
-    # Set mysql log and slow query log to /dev/stdout for container logging
-    sed -i 's/NULL/\/dev\/stdout/g' /etc/my.cnf.d/server.cnf
-}
-
-if [ "$1" = 'mysqld' ]; then
+if [ "$1" = 'mysqld' -a -z "$wantHelp" ]; then
 	# Get config
-	#DATADIR="$("$@" --verbose --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
-	DATADIR="/var/lib/mysql"
+	DATADIR="$("$@" --verbose --help --log-bin-index=`mktemp -u` 2>/dev/null | awk '$1 == "datadir" { print $2; exit }')"
 
 	if [ ! -d "$DATADIR/mysql" ]; then
-		if [ -z "$MYSQL_ROOT_PASSWORD" -a -z "$MYSQL_ALLOW_EMPTY_PASSWORD" ]; then
-			echo >&2 'error: database is uninitialized and MYSQL_ROOT_PASSWORD not set'
-			echo >&2 '  Did you forget to add -e MYSQL_ROOT_PASSWORD=... ?'
+		if [ -z "$MYSQL_ROOT_PASSWORD" -a -z "$MYSQL_ALLOW_EMPTY_PASSWORD" -a -z "$MYSQL_RANDOM_ROOT_PASSWORD" ]; then
+			echo >&2 'error: database is uninitialized and password option is not specified '
+			echo >&2 '  You need to specify one of MYSQL_ROOT_PASSWORD, MYSQL_ALLOW_EMPTY_PASSWORD and MYSQL_RANDOM_ROOT_PASSWORD'
 			exit 1
 		fi
 
@@ -75,20 +78,10 @@ if [ "$1" = 'mysqld' ]; then
 			mysql_tzinfo_to_sql /usr/share/zoneinfo | sed 's/Local time zone must be set--see zic manual page/FCTY/' | "${mysql[@]}" mysql
 		fi
 
-
-		if [ ${DBMODE} = "BOOTSTRAP" ]; then
-			preflight
-			echo "Creating SST User for cluster state transfer..."
-			"${mysql[@]}" <<-EOSQL
-				--  Set up sst user for galera
-				SET @@SESSION.SQL_LOG_BIN=0;
-	
-				CREATE USER '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASS}' ;
-				GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%' ;
-				FLUSH PRIVILEGES ;
-			EOSQL
-		fi	
-
+		if [ ! -z "$MYSQL_RANDOM_ROOT_PASSWORD" ]; then
+			MYSQL_ROOT_PASSWORD="$(pwgen -1 32)"
+			echo "GENERATED ROOT PASSWORD: $MYSQL_ROOT_PASSWORD"
+		fi
 		"${mysql[@]}" <<-EOSQL
 			-- What's done in this file shouldn't be replicated
 			--  or products like mysql-fabric won't work
@@ -120,12 +113,20 @@ if [ "$1" = 'mysqld' ]; then
 			echo 'FLUSH PRIVILEGES ;' | "${mysql[@]}"
 		fi
 
+		if [ "$SST_USER" -a "$SST_PASS" ]; then
+			echo "########## CREATING SST USER FOR REPLICATION ##########"
+			echo "CREATE USER '$SST_USER'@'%' IDENTIFIED BY '$SST_PASS' ;" | "${mysql[@]}"
+			echo "GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO '$SST_USER'@'%' ;" | "${mysql[@]}"
+			echo 'FLUSH PRIVILEGES ;' | "${mysql[@]}"
+		fi
+
 		echo
 		for f in /docker-entrypoint-initdb.d/*; do
 			case "$f" in
-				*.sh)  echo "$0: running $f"; . "$f" ;;
-				*.sql) echo "$0: running $f"; "${mysql[@]}" < "$f" && echo ;;
-				*)     echo "$0: ignoring $f" ;;
+				*.sh)     echo "$0: running $f"; . "$f" ;;
+				*.sql)    echo "$0: running $f"; "${mysql[@]}" < "$f"; echo ;;
+				*.sql.gz) echo "$0: running $f"; gunzip -c "$f" | "${mysql[@]}"; echo ;;
+				*)        echo "$0: ignoring $f" ;;
 			esac
 			echo
 		done
@@ -140,35 +141,36 @@ if [ "$1" = 'mysqld' ]; then
 		echo
 	fi
 
-	chown -R mysql:mysql "/var/lib/mysql"
+	chown -R mysql:mysql "$DATADIR"
 fi
+}
 
-if [ -z ${DBMODE+x} ]; then
-    attn
-    echo >&2 "DBMODE variable must be defined as STANDALONE, BOOTSTRAP or a comma-separated list of container names."
+if [ -z ${CLUSTER+x} ]; then
+    echo >&2 "########### CLUSTER variable must be defined as STANDALONE, BOOTSTRAP or a comma-separated list of container names."
     exit 1
-elif [ ${DBMODE} = "STANDALONE" ]; then
-    attn
-    echo "Starting MariaDB in STANDALONE mode..."
-    # Set mysql log and slow query log to /dev/stdout for container logging
-    sed -i 's/NULL/\/dev\/stdout/g' /etc/my.cnf.d/server.cnf
-    exec "$@" 
-elif [ ${DBMODE} = "BOOTSTRAP" ]; then
-    attn
-    echo "Bootstrapping MariaDB cluster ${CLUSTER_NAME} with primary node ${HOSTNAME}..."
+elif [ ${CLUSTER} = "STANDALONE" ]; then
+    initialize_db $@
+    echo "########### Starting MariaDB in STANDALONE mode..."
+    exec $@
+elif [ ${CLUSTER} = "BOOTSTRAP" ]; then
     preflight
+    initialize_db $@
+    echo "########### Bootstrapping MariaDB cluster ${CLUSTER_NAME} with primary node ${HOSTNAME}..."
     cluster_conf
+    echo "########### Starting MariaDB cluster..."
+    # Workaround odd bug(?) causing corrupted binlog index after initialization
+    mv /var/lib/mysql/mysql-bin.index /tmp
     exec $@ --wsrep_node_address="${HOSTNAME}" \
-	--wsrep_cluster_name="${CLUSTER_NAME}" \
-        --wsrep_new_cluster --wsrep_cluster_address="gcomm://" \
-	--wsrep_node_name="${HOSTNAME}" 
+    --wsrep_cluster_name="${CLUSTER_NAME}" \
+    --wsrep_new_cluster --wsrep_cluster_address="gcomm://" \
+    --wsrep_node_name="${HOSTNAME}" 
 else
-    attn
-    echo "Joining MariaDB cluster ${CLUSTER_NAME} on nodes ${DBMODE}..."
+    echo "########### Joining MariaDB cluster ${CLUSTER_NAME} on nodes ${CLUSTER}..."
     preflight
+    initialize_db $@
     cluster_conf
     exec $@ --wsrep_node_address="${HOSTNAME}" \
-	--wsrep_cluster_name="${CLUSTER_NAME}" \
-        --wsrep_cluster_address=gcomm://${DBMODE}
-	--wsrep_node_name="${HOSTNAME}"
+    --wsrep_cluster_name="${CLUSTER_NAME}" \
+    --wsrep_cluster_address="gcomm://${CLUSTER}"
+    --wsrep_node_name="${HOSTNAME}" 
 fi
