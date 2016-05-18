@@ -1,1 +1,1 @@
-# centos7-tomcat8
+My dockerfiles for various images on docker hub.
