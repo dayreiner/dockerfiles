@@ -10,7 +10,6 @@ RUN yum clean all && yum makecache fast && yum -y update
 RUN yum -y install epel-release && yum clean all && yum makecache fast && yum -y update \
     && yum -y install cronie git wget && yum clean all
 
-#    && yum clean all && yum makecache fast && yum -y update \
 # Install Docker client so we can mount the local socket to run docker exec jobs
 RUN curl -fsSL https://get.docker.com/ | sh
 
