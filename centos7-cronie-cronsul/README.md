@@ -35,13 +35,13 @@ Run the Container
 To run the container with docker support (optional), make sure to mount docker.sock as a volume in the container. You must also pass it the path to your cron jobs file as defined in the previous section (required):
 
 ```
-docker run -d -v /var/run/docker.sock:/var/run/docker.sock -v $/path/to/your/cron-jobs-file:/cron-jobs --name=cronsul dayreiner/centos7-cronie-cronsul
+docker run -d -v /var/run/docker.sock:/var/run/docker.sock -v $/path/to/your/cron-jobs-file:/cron-jobs --name=cronsul dayreiner/cronie-cronsul
 ```
 or via docker-compose:
 
 ```
   cron:
-    image: dayreiner/centos7-cronie-cronsul:latest
+    image: dayreiner/cronie-cronsul:latest
     container_name: cron
     network_mode: host
     volumes:
