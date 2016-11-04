@@ -1,0 +1,8 @@
+SHELL=/bin/bash
+TERM=xterm
+HOME=/
+CRONLOG=/dev/stdout
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH
+CONSUL_HOST=172.17.0.1
+CONSUL_PORT=8500
+* * * * * cronsul cronlocktest echo "Hello! Container $(hostname) obtained the lock in consul."
