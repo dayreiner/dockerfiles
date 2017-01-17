@@ -7,7 +7,7 @@ ENV REDIS_URL=https://github.com/antirez/redis.git \
     GOSU_VERSION=1.10
 
 # Updates and Install build requirements
-    && yum clean all && yum makecache fast && yum -y update \
+RUN yum clean all && yum makecache fast && yum -y update \
     # Instal Ruby
     && yum -y install ruby \
     # Reset yum history so we can rollback the devtools installs / reduce image size
