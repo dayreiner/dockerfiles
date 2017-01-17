@@ -1,4 +1,5 @@
 FROM centos:latest
+MAINTAINER dayreiner
 
 ENV REDIS_URL=https://github.com/antirez/redis.git \
     REDIS_VERSION=3.2 \
@@ -9,7 +10,8 @@ ENV REDIS_URL=https://github.com/antirez/redis.git \
 RUN groupadd -r redis && useradd -r -g redis redis
 
 RUN yum clean all && yum makecache fast && yum -y update \
-    && yum clean all  && yum history new \
+    && yum -y install ruby \
+    && yum clean all && yum history new \
     && yum -y install git gcc make glibc-devel git
 
 # Setup gosu for easier command execution
@@ -27,7 +29,9 @@ RUN set -x \
     && git clone -b ${REDIS_VERSION} "$REDIS_URL" /usr/src/redis \
     && make -C /usr/src/redis \
     && make -C /usr/src/redis install \
-    && rm -r /usr/src/redis \
+    && cp /usr/src/redis/src/redis-trib.rb /usr/local/bin/redis-trib.rb \
+    && chmod u+x /usr/local/bin/redis-trib.rb \
+    && rm -rf /usr/src/redis \
     && yum -y history undo 1 && yum clean all \
     && mkdir /data && chown redis:redis /data
 
@@ -36,8 +40,8 @@ WORKDIR /data
 
 COPY redis.conf /usr/local/etc/redis/redis.conf
 
-COPY docker-entrypoint.sh /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
 EXPOSE 6379 16379
 CMD [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
