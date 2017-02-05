@@ -2,8 +2,15 @@ FROM centos/httpd:latest
 MAINTAINER dayreiner
 
 # Update and install latest packages and prerequisites
-RUN yum -y install https://mirror.webtatic.com/yum/el7/webtatic-release.rpm
-RUN yum -y install git composer php71w php71w-cli php71w-common php71w-opcache php71w-mysql php71w-mbstring
+RUN yum makecache fast && yum -y --setopt=tsflags=nodocs update \
+    && yum -y --setopt=tsflags=nodocs install https://mirror.webtatic.com/yum/el7/webtatic-release.rpm \
+    && yum -y --setopt=tsflags=nodocs install git php71w php71w-cli php71w-common php71w-opcache php71w-mysql php71w-mbstring \
+    && yum clean all && yum history new
+
+# Install php composer
+RUN curl -sS https://getcomposer.org/installer | php \
+    && mv /composer.phar /usr/bin/composer \
+    && chmod +x /usr/bin/composer
 
 COPY config/php.ini /etc/php.ini
 
