@@ -4,7 +4,7 @@ MAINTAINER dayreiner
 # Update and install latest packages and prerequisites
 RUN yum makecache fast && yum -y --setopt=tsflags=nodocs update \
     && yum -y --setopt=tsflags=nodocs install https://mirror.webtatic.com/yum/el7/webtatic-release.rpm \
-    && yum -y --setopt=tsflags=nodocs install git php71w php71w-cli php71w-common php71w-opcache php71w-mysql php71w-mbstring \
+    && yum -y --setopt=tsflags=nodocs install git php71w php71w-cli php71w-common php71w-opcache php71w-mysql php71w-mbstring php71w-xml \
     && yum clean all && yum history new
 
 # Install php composer
